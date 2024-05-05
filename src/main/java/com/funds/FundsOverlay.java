@@ -1,40 +1,90 @@
 package com.funds;
 
 import com.google.inject.Inject;
-import net.runelite.api.Client;
-import net.runelite.api.Point;
-import net.runelite.client.plugins.xpglobes.XpGlobe;
+import lombok.Setter;
 import net.runelite.client.ui.overlay.Overlay;
-import net.runelite.client.ui.overlay.OverlayUtil;
+import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.components.PanelComponent;
+import net.runelite.client.ui.overlay.components.TitleComponent;
 
 import java.awt.*;
-import java.awt.geom.Arc2D;
+import java.text.DecimalFormat;
 
 public class FundsOverlay extends Overlay {
-    private final Client client;
+    @Setter
+    private long profitValue;
+    private long startTime;
+    private boolean inSession;
+
     private final FundsConfig fundsConfig;
+    private final PanelComponent panelComponent = new PanelComponent();
 
     @Inject
-    public FundsOverlay(Client client, FundsConfig fundsConfig) {
-        this.client = client;
+    public FundsOverlay(FundsConfig fundsConfig) {
+        setPosition(OverlayPosition.TOP_LEFT);
+        profitValue = 0L;
         this.fundsConfig = fundsConfig;
+        startTime = 1;
+        inSession = true;
     }
 
     @Override
-    public Dimension render(Graphics2D graphics2D) {
-        return null;
+    public Dimension render(Graphics2D graphics) {
+        String titleText = "Funds Tracker:";
+        long elapsed;
+
+        if (startTime > 0) {
+            elapsed = (System.currentTimeMillis() - startTime) / 1000;
+        } else {
+            elapsed = 0;
+        }
+
+        // TITLE
+        panelComponent.getChildren().clear();
+        panelComponent.getChildren().add(TitleComponent.builder()
+                .text(titleText)
+                .color(Color.GREEN)
+                .build());
+
+        // RESET
+        if (!inSession) {
+            panelComponent.getChildren().add(TitleComponent.builder()
+                    .text("Reset Plugin")
+                    .color(Color.RED)
+                    .build());
+        }
+
+        // WIDTH
+        panelComponent.setPreferredSize(new Dimension(
+                graphics.getFontMetrics().stringWidth(titleText) + 40,
+                0));
+
+        // PROFITS
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Profit:")
+                .right(profitFormat(profitValue))
+                .build());
+
+        // TIME
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Time:")
+                .right(timeFormat(elapsed))
+                .build());
+
+        return panelComponent.render(graphics);
     }
 
-    private void drawProgressArc(Graphics2D graphics, int x, int y, int w, int h, double radiusStart, double radiusEnd, int strokeWidth, Color color) {
-        Stroke stroke = graphics.getStroke();
-        graphics.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL));
-        graphics.setColor(color);
-        graphics.draw(new Arc2D.Double(
-                x, y,
-                w, h,
-                radiusStart, radiusEnd,
-                Arc2D.OPEN));
-        graphics.setStroke(stroke);
+    public static String profitFormat(long profitValue) {
+        DecimalFormat df = new DecimalFormat("###,###,###");
+        return df.format(profitValue);
     }
 
+    public static String timeFormat(long elapsedTime) {
+        final long sec = elapsedTime % 60;
+        final long min = (elapsedTime / 60) % 60;
+        final long hr = elapsedTime / 3600;
+
+        return String.format("%02d:%02d:%02d", hr, min, sec);
+    }
 }
